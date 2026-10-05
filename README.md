@@ -55,11 +55,26 @@ Lo único agregado es `CSS_QR`: en las etiquetas con QR el texto ocupa la
 columna izquierda y el QR la derecha. En esas etiquetas, el texto que no cabe
 se reduce de tamaño; mueble y tipo de pieza pueden partirse en dos renglones.
 
-## Integración (pendiente)
+## API (Render Web Service)
 
-`procesar(pdf_pb, csv_texto, nombre_opti, url_de, qr_mm)` es el punto de
-entrada único para la API: recibe bytes/texto y devuelve hojas, reporte, HTML
-y resumen, sin tocar disco.
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+- Variable de entorno: `API_KEY` (también se acepta `APY_KEY`). La clave no va
+  en el código ni en el repositorio.
+
+Todas las llamadas, menos `/salud`, llevan el header `X-API-Key`.
+
+| Endpoint | Entrada (multipart) | Salida (JSON) |
+|---|---|---|
+| `GET /salud` | — | `{"ok": true}` |
+| `POST /procesar` | `pdf_pb`, `csv_etiquetas`, `nombre`, `formato` (opcional) | `resumen`, `reporte`, `hojas: [{archivo, mime, base64}]` |
+| `POST /etiquetas` | `pdf_pb`, `csv_etiquetas`, `nombre`, `enlaces` (JSON `{archivo: url}`), `qr_mm` (opcional) | `resumen`, `html` |
+
+El servicio no guarda nada entre llamadas. Flujo: `/procesar` → quien llama
+sube las hojas y obtiene sus enlaces → `/etiquetas` con esos enlaces.
+
+Errores: 401 clave inválida, 400 parámetros mal formados, 413 archivo mayor a
+30 MB, 422 el PDF o el CSV no son lo esperado.
 
 ## Por qué imágenes y no un PDF por mueble
 

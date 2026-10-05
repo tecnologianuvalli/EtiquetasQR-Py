@@ -39,7 +39,6 @@ import sys
 import unicodedata
 from collections import OrderedDict, defaultdict
 
-import pdfplumber
 import pypdfium2 as pdfium
 import segno
 from PIL import Image
@@ -233,11 +232,13 @@ def _sin_puntos(t):
 
 
 def leer_pb(pdf):
-    """pdf: ruta o archivo binario. Devuelve [dict(pagina, mueble, ref, maquinado)]."""
+    """pdf: ruta o bytes. Devuelve [dict(pagina, mueble, ref, maquinado)]."""
     piezas, mueble_actual = [], None
-    with pdfplumber.open(pdf) as doc:
-        for num, pagina in enumerate(doc.pages, 1):
-            lineas = [l.strip() for l in (pagina.extract_text() or '').split('\n') if l.strip()]
+    doc = pdfium.PdfDocument(pdf)
+    try:
+        for num in range(1, len(doc) + 1):
+            texto = doc[num - 1].get_textpage().get_text_bounded() or ''
+            lineas = [l.strip() for l in re.split(r'[\r\n]+', texto) if l.strip()]
             ini = next((i + 1 for i, l in enumerate(lineas[:6]) if RE_PAGINA.match(l)), None)
             if ini is None or len(lineas) <= ini + 1:
                 continue
@@ -254,6 +255,8 @@ def leer_pb(pdf):
                                    maquinado=maquinado))
             elif re.match(r'^Altura\s+[\d.]+\s*mm', cuerpo[1]):
                 mueble_actual = cuerpo[0]       # portada de mueble
+    finally:
+        doc.close()
     return piezas
 
 
@@ -309,16 +312,23 @@ def cruzar(items, piezas_pb):
     return grupos
 
 
+_PALETA_16_GRISES = sum(([v * 17] * 3 for v in range(16)), [])
+
+
 def _png_de_paginas(doc, paginas):
-    """Una sola imagen PNG con las páginas apiladas (gris, 16 tonos)."""
+    """Una sola imagen PNG con las páginas apiladas, en 16 tonos de gris
+    (paleta fija de 4 bits: liviana y rápida de generar)."""
     imgs = [doc[n - 1].render(scale=PNG_DPI / 72, grayscale=True).to_pil() for n in paginas]
     lienzo = Image.new('L', (max(i.width for i in imgs), sum(i.height for i in imgs)), 255)
     y = 0
     for i in imgs:
         lienzo.paste(i, (0, y))
         y += i.height
+    indices = Image.eval(lienzo, lambda v: min(15, (v + 8) // 17))
+    png = Image.frombytes('P', lienzo.size, indices.tobytes())
+    png.putpalette(_PALETA_16_GRISES)
     buf = io.BytesIO()
-    lienzo.quantize(16).save(buf, 'PNG', optimize=True)
+    png.save(buf, 'PNG', bits=4, compress_level=6)
     return buf.getvalue()
 
 
@@ -469,15 +479,16 @@ def generar_html_etiquetas(nombre_opti, items, enlaces=None, qr_mm=15):
 # ============================================================================
 # 5) Punto de entrada único (lo que llamará la API)
 # ============================================================================
-def procesar(pdf_pb, csv_texto, nombre_opti, url_de=None, qr_mm=15, formato=None):
+def procesar(pdf_pb, csv_texto, nombre_opti, url_de=None, qr_mm=15, formato=None, con_hojas=True):
     """pdf_pb: ruta o bytes. url_de: función archivo ('<codigo>.<ext>') -> url
     (o None para no generar etiquetas). Devuelve dict con grupos, hojas, reporte, html, resumen."""
-    abrir = (lambda: io.BytesIO(pdf_pb)) if isinstance(pdf_pb, (bytes, bytearray)) else (lambda: pdf_pb)
-    piezas_pb = leer_pb(abrir())
+    piezas_pb = leer_pb(pdf_pb)
     parse = parsear_etiquetas_opticut(csv_texto)
     grupos = cruzar(parse['items'], piezas_pb)
     formato = formato or FORMATO_HOJAS
-    hojas = generar_hojas(pdf_pb, grupos, formato)
+    # con_hojas=False ahorra el trabajo de partir el PDF cuando solo se
+    # necesita el HTML (segunda llamada de la API).
+    hojas = generar_hojas(pdf_pb, grupos, formato) if con_hojas else {}
 
     enlaces = {}
     if url_de:
@@ -490,7 +501,7 @@ def procesar(pdf_pb, csv_texto, nombre_opti, url_de=None, qr_mm=15, formato=None
         grupos=grupos, hojas=hojas, reporte=reporte_filas(grupos, piezas_pb, formato),
         html=generar_html_etiquetas(nombre_opti, parse['items'], enlaces, qr_mm) if url_de else None,
         resumen=dict(
-            hojas_pb=len(piezas_pb), archivos=len(hojas),
+            hojas_pb=len(piezas_pb), archivos=sum(1 for g in grupos.values() if g['paginas']),
             peso_kb=round(sum(map(len, hojas.values())) / 1024), etiquetas=total, paneles=parse['paneles'],
             enlazan=sum(g['etiquetas'] for g in grupos.values() if g['paginas']),
             varias_hojas=sum(g['etiquetas'] for g in grupos.values() if len(g['paginas']) > 1),
