@@ -1,0 +1,96 @@
+﻿estado;mueble;tipo_pieza;etiquetas;hojas;paginas_PB;archivo;nota
+EXCLUIDA;COSTADO-72-15-60[2];PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 63)
+EXCLUIDA;COSTADO-72-15-60[3];PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 65)
+OK (varias hojas);ALPV-2P-91-70-30-F15MM;Puerta 15mm Alacena;4;2;37 38;d1718be1.png;
+OK;ALRIN-1P-NORM-DER-91-70-30-F15MM;Puerta 15mm Alacena;2;1;57;4174c7c8.png;
+OK;GAFR-2P-72-90-60-R;VISTA 120MM (15MM);2;1;94;8c0fc13b.png;
+EXCLUIDA;GARIN-NORM-IZQ-72-100-60-F15MM;Puerta 15mm Vista Lluvia;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 130)
+EXCLUIDA;GARIN-NORM-DER-72-100-60-F15MM;Puerta 15mm Vista Lluvia;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 118)
+OK (varias hojas);GACAJ-3C-IMP-75-70-60-F15MM;VISTA 50-70MM (15MM);6;2;77 78;9d108420.png;
+EXCLUIDA;GACAJ-3C-IMP-75-70-60-F15MM;Frente Cajon IMPAZ CHICO Vista Lluvia (superior);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 79 80)
+EXCLUIDA;GACAJ-3C-IMP-75-70-60-F15MM;Frente Cajon IMPAZ CHICO Vista Lluvia (intermedio);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 79 80)
+EXCLUIDA;ALCAM-2P-35-70-30-F15MM;Puerta 15mm Alacena Push;4;0;;;Excluida: su hoja de PB no trae operaciones (pág. 20)
+OK (varias hojas);ALMIC-2P-91-70-30-F15MM;Lateral Derecho, Lateral Izquierdo;4;2;24 25;2f0393b6.png;
+OK;ALMIC-2P-91-70-30-F15MM;Techo;2;1;22;b72e4d97.png;
+EXCLUIDA;GARIN-NORM-DER-72-100-60-F15MM;Fijo Esquinero Recto (color);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 117)
+EXCLUIDA;GARIN-NORM-IZQ-72-100-60-F15MM;Fijo Esquinero Recto (color);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 129)
+EXCLUIDA;AJUSTE-72-05-15[5];PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 12)
+EXCLUIDA;AJUSTE-72-05-15;PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 8)
+EXCLUIDA;AJUSTE-72-05-15[3];PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 10)
+EXCLUIDA;FIJOSUP-10-120-1.5;PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 67)
+OK (varias hojas);ALPV-2P-91-70-30-F15MM[1];Puerta 15mm Alacena;4;2;46 47;f85b41b4.png;
+OK;ALMIC-2P-91-70-30-F15MM;Trasera;2;1;26;3117987d.png;
+OK;GAFR-2P-72-90-60-R;Lateral Izquierdo;2;1;91;b51e9dc6.png;
+OK (varias hojas);GAFR-2P-72-90-60-R;Puerta 15mm Vista Lluvia;4;2;95 96;2448380c.png;
+OK;ALMIC-2P-91-70-30-F15MM;Estante Fijo Piso;2;1;28;c157ce7c.png;
+OK;GAPV-1P-72-35-60-F15MM;Puerta 15mm Vista Lluvia;2;1;106;df3c4088.png;
+EXCLUIDA;COSTADO-72-15-60;PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 59)
+EXCLUIDA;VISTA-10-120-1.5;PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 132)
+OK;ALMIC-2P-91-70-30-F15MM;Suelo;2;1;23;fa52201c.png;
+OK;GAPV-1P-72-35-60-F15MM;VISTA 50-70MM (15MM);2;1;105;6f0b1e9f.png;
+EXCLUIDA;COSTADO-72-15-60[1];PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 61)
+EXCLUIDA;ALMIC-2P-91-70-30-F15MM;Estante Movil;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 27)
+EXCLUIDA;ALMIC-2P-91-70-30-F15MM;Puerta 15mm Alacena Push;4;0;;;Excluida: su hoja de PB no trae operaciones (pág. 29)
+EXCLUIDA;GACAJ-3C-IMP-75-70-60-F15MM;Frente Cajon IMPAZ GRANDE Vista Lluvia (inferior);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 81)
+OK;ALRIN-1P-NORM-DER-91-70-30-F15MM;Lateral Izquierdo;2;1;52;228d92bd.png;
+EXCLUIDA;FIJOSUP-10-120-1.5[1];PIEZA LIBRE COLOR;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 69)
+OK;ALPV-2P-91-70-30-F15MM;Lateral Derecho;2;1;33;0f1ab3a0.png;
+OK;GARIN-NORM-DER-72-100-60-F15MM;VISTA 50-70MM (15MM);2;1;115;14fae1e8.png;
+OK;GARIN-NORM-IZQ-72-100-60-F15MM;VISTA 50-70MM (15MM);2;1;127;3a7fdb21.png;
+OK;GARIN-NORM-DER-72-100-60-F15MM;Suelo;2;1;110;722b483e.png;
+OK;GARIN-NORM-IZQ-72-100-60-F15MM;Suelo;2;1;122;2161b0db.png;
+EXCLUIDA;GARIN-NORM-DER-72-100-60-F15MM;Estante Movil;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 114)
+EXCLUIDA;ALRIN-1P-NORM-DER-91-70-30-F15MM;Frontal Esquinero Recto (blanco);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 55)
+EXCLUIDA;GARIN-NORM-IZQ-72-100-60-F15MM;Estante Movil;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 126)
+OK (varias hojas);GAPV-1P-72-35-60-F15MM;Lateral Derecho, Lateral Izquierdo;4;2;101 102;eb037e3a.png;
+OK;GAFR-2P-72-90-60-R;Suelo;2;1;89;9714c4bb.png;
+OK;GAFR-2P-72-90-60-R;Trasera_TS;2;1;92;f6675991.png;
+EXCLUIDA;GARIN-NORM-DER-72-100-60-F15MM;Fijo Esquinero Recto (blanco);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 116)
+EXCLUIDA;GARIN-NORM-IZQ-72-100-60-F15MM;Fijo Esquinero Recto (blanco);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 128)
+OK;ALRIN-1P-NORM-DER-91-70-30-F15MM;Trasera;2;1;53;e819e260.png;
+OK;GACAJ-3C-IMP-75-70-60-F15MM;Trasera;2;1;76;58652739.png;
+OK;GAPV-1P-72-35-60-F15MM;Trasera;2;1;103;1c675d1b.png;
+EXCLUIDA;GAPV-1P-72-35-60-F15MM;Estante Movil;2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 104)
+OK;ALRIN-1P-NORM-DER-91-70-30-F15MM;Techo;2;1;49;1df49373.png;
+OK;ALRIN-1P-NORM-DER-91-70-30-F15MM;Suelo;2;1;50;ac9b710d.png;
+OK;GACAJ-3C-IMP-75-70-60-F15MM;Trasera Cajon IMPAZ GRANDE Vista Lluvia (inferior);2;1;87;ad2aed49.png;
+OK (varias hojas);GARIN-NORM-DER-72-100-60-F15MM;Lateral Derecho, Lateral Izquierdo;4;2;111 112;abc8d50d.png;
+OK;GAFR-2P-72-90-60-R;Trasera_TI;2;1;93;9a7fe1d9.png;
+OK;GARIN-NORM-DER-72-100-60-F15MM;Trasera;2;1;113;20824fc4.png;
+OK;GARIN-NORM-DER-72-100-60-F15MM;Techo_TS;2;1;108;245a9316.png;
+OK;GARIN-NORM-DER-72-100-60-F15MM;Techo_TI;2;1;109;d267e680.png;
+OK;ALCAM-2P-35-70-30-F15MM;Techo;2;1;14;72a592f5.png;
+OK;ALCAM-2P-35-70-30-F15MM;Suelo;2;1;15;17bf306b.png;
+OK;ALPV-2P-91-70-30-F15MM;Techo;2;1;31;d3821cff.png;
+OK;ALPV-2P-91-70-30-F15MM;Lateral Izquierdo;2;1;34;2c9c496c.png;
+OK (varias hojas);GACAJ-3C-IMP-75-70-60-F15MM;Trasera Cajon IMPAZ CHICO Vista Lluvia (superior);2;2;85 86;f9e74499.png;
+OK;ALPV-2P-91-70-30-F15MM;Trasera;2;1;35;a75c07fd.png;
+OK (varias hojas);GARIN-NORM-IZQ-72-100-60-F15MM;Lateral Derecho, Lateral Izquierdo;4;2;123 124;47ea8b35.png;
+OK (varias hojas);ALCAM-2P-35-70-30-F15MM;Lateral Derecho, Lateral Izquierdo;4;2;16 17;5efe160b.png;
+EXCLUIDA;ALCAM-2P-35-70-30-F15MM;Estante Movil;4;0;;;Excluida: su hoja de PB no trae operaciones (pág. 19)
+OK (varias hojas);GACAJ-3C-IMP-75-70-60-F15MM;Lateral Derecho, Lateral Izquierdo;4;2;74 75;e7f3e6d1.png;
+OK;GAFR-2P-72-90-60-R;Lateral Derecho;2;1;90;96772f21.png;
+OK;GACAJ-3C-IMP-75-70-60-F15MM;Techo_TS;2;1;71;1489664b.png;
+OK;GAPV-1P-72-35-60-F15MM;Techo_TS;2;1;98;e0be998a.png;
+EXCLUIDA;ALPV-2P-91-70-30-F15MM;Estante Movil;4;0;;;Excluida: su hoja de PB no trae operaciones (pág. 36)
+EXCLUIDA;ALRIN-1P-NORM-DER-91-70-30-F15MM;Estante Movil;4;0;;;Excluida: su hoja de PB no trae operaciones (pág. 54)
+OK;GARIN-NORM-IZQ-72-100-60-F15MM;Trasera;2;1;125;c135847f.png;
+OK;GARIN-NORM-IZQ-72-100-60-F15MM;Techo_TS;2;1;120;d066ca07.png;
+OK;GARIN-NORM-IZQ-72-100-60-F15MM;Techo_TI;2;1;121;2ad88eb6.png;
+OK;ALPV-2P-91-70-30-F15MM;Suelo;2;1;32;a56ef118.png;
+OK;ALPV-2P-91-70-30-F15MM[1];Techo;2;1;40;75fc90d3.png;
+OK;ALPV-2P-91-70-30-F15MM[1];Suelo;2;1;41;a7827414.png;
+OK;ALRIN-1P-NORM-DER-91-70-30-F15MM;Lateral Derecho;2;1;51;7615bce7.png;
+OK (varias hojas);GACAJ-3C-IMP-75-70-60-F15MM;Trasera Cajon IMPAZ CHICO Vista Lluvia (intermedio);2;2;85 86;8f37c003.png;
+OK;ALPV-2P-91-70-30-F15MM[1];Trasera;2;1;44;ac36be85.png;
+EXCLUIDA;ALPV-2P-91-70-30-F15MM[1];Estante Movil;4;0;;;Excluida: su hoja de PB no trae operaciones (pág. 45)
+OK;GACAJ-3C-IMP-75-70-60-F15MM;Techo_TI;2;1;72;f3c8891e.png;
+OK;GAPV-1P-72-35-60-F15MM;Techo_TI;2;1;99;fcd2a776.png;
+OK;ALCAM-2P-35-70-30-F15MM;Trasera;2;1;18;29715dfb.png;
+OK;GACAJ-3C-IMP-75-70-60-F15MM;Suelo;2;1;73;97ddb649.png;
+OK;GAPV-1P-72-35-60-F15MM;Suelo;2;1;100;ae7f847c.png;
+OK (varias hojas);ALPV-2P-91-70-30-F15MM[1];Lateral Derecho, Lateral Izquierdo;4;2;42 43;974062f3.png;
+OK (varias hojas);GACAJ-3C-IMP-75-70-60-F15MM;Fondo Cajon IMPAZ CHICO Vista Lluvia (superior);2;2;82 83;1bc55c3b.png;
+OK (varias hojas);GACAJ-3C-IMP-75-70-60-F15MM;Fondo Cajon IMPAZ CHICO Vista Lluvia (intermedio);2;2;82 83;27607ef6.png;
+OK;GACAJ-3C-IMP-75-70-60-F15MM;Fondo Cajon IMPAZ GRANDE Vista Lluvia (inferior);2;1;84;a9e58098.png;
+EXCLUIDA;ALRIN-1P-NORM-DER-91-70-30-F15MM;Frontal Esquinero Recto (color);2;0;;;Excluida: su hoja de PB no trae operaciones (pág. 56)
