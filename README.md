@@ -44,6 +44,34 @@ las etiquetas de la WebApp.
 - Sin coincidencia no hay QR: la etiqueta sale como hoy y queda en el reporte
   con una sugerencia. Nunca se adivina.
 
+### Coincidencia aproximada (nombres editados al exportar)
+
+Si el nombre del mueble o de la pieza no coincide exacto (se acortó, perdió
+acentos, se abrevió o tiene una errata), se compara por palabras: las del
+nombre más corto deben aparecer, en orden, en el más largo. Ejemplo:
+`Frente Cajon EXTENSION` ~ `Frente Cajón EXTENSIÓN Vista Lluvia (inferior)`;
+`GACAJ-3C-IMP-75-70-60` ~ `GACAJ-3C-IMP-75-70-60-F15MM`.
+
+Para que nunca abra una hoja equivocada, una coincidencia aproximada solo vale si:
+
+- **las medidas de la etiqueta son las de la hoja de PB** (Opticut y PB
+  coinciden al décimo de mm; tolerancia 0.6 mm, en cualquier orientación), y
+- **queda una sola pieza de PB posible**. Si varias se parecen al nombre y
+  miden igual, desempata el tablero; si tampoco, queda **sin QR** con la nota
+  "Ambigua" (p. ej. `Fondo Cajon IMPAZ` con CHICO y GRANDE de 497.5 × 299).
+
+Un nombre acortado que agrupa piezas distintas (`Frente Cajon EXTENSION` para
+inferior, intermedio y superior) se reparte por medidas: cada etiqueta enlaza
+su propia hoja. Números y códigos con números son exactos (`3C` no es `2C`,
+`F15MM` no es `F18MM`) y la instancia del mueble también (`[2]` no es `[3]`).
+
+La coincidencia exacta de siempre va primero y no cambia: mismos grupos y
+mismos nombres de archivo, así que los QR ya impresos siguen sirviendo. Las
+aproximadas salen en el reporte como `OK (aproximado)` con la pieza de PB con
+la que enlazaron, para revisarlas; `resumen.aproximadas` las cuenta.
+
+Pruebas: `python test_cruce.py`.
+
 ## Formato de etiquetas
 
 `CSS_ETIQUETAS`, `parsear_etiquetas_opticut()` y `generar_html_etiquetas()`
@@ -55,26 +83,11 @@ Lo único agregado es `CSS_QR`: en las etiquetas con QR el texto ocupa la
 columna izquierda y el QR la derecha. En esas etiquetas, el texto que no cabe
 se reduce de tamaño; mueble y tipo de pieza pueden partirse en dos renglones.
 
-## API (Render Web Service)
+## Integración (pendiente)
 
-- Build command: `pip install -r requirements.txt`
-- Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
-- Variable de entorno: `API_KEY` (también se acepta `APY_KEY`). La clave no va
-  en el código ni en el repositorio.
-
-Todas las llamadas, menos `/salud`, llevan el header `X-API-Key`.
-
-| Endpoint | Entrada (multipart) | Salida (JSON) |
-|---|---|---|
-| `GET /salud` | — | `{"ok": true}` |
-| `POST /procesar` | `pdf_pb`, `csv_etiquetas`, `nombre`, `formato` (opcional) | `resumen`, `reporte`, `hojas: [{archivo, mime, base64}]` |
-| `POST /etiquetas` | `pdf_pb`, `csv_etiquetas`, `nombre`, `enlaces` (JSON `{archivo: url}`), `qr_mm` (opcional) | `resumen`, `html` |
-
-El servicio no guarda nada entre llamadas. Flujo: `/procesar` → quien llama
-sube las hojas y obtiene sus enlaces → `/etiquetas` con esos enlaces.
-
-Errores: 401 clave inválida, 400 parámetros mal formados, 413 archivo mayor a
-30 MB, 422 el PDF o el CSV no son lo esperado.
+`procesar(pdf_pb, csv_texto, nombre_opti, url_de, qr_mm)` es el punto de
+entrada único para la API: recibe bytes/texto y devuelve hojas, reporte, HTML
+y resumen, sin tocar disco.
 
 ## Por qué imágenes y no un PDF por mueble
 
