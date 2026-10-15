@@ -254,6 +254,24 @@ def test_nombre_de_pieza_que_solo_comparte_el_inicio():
     assert not q._mismo_arranque('Lateral Cajon EXTENSIÓN 50CM', 'Lateral Derecho')
 
 
+# --- Piezas libres: en la etiqueta se imprime solo su descripción -------------
+def test_pieza_libre_se_quita_solo_en_lo_impreso():
+    assert q.tipo_pieza_etiqueta('PIEZA LIBRE COLOR MTRO 2BLE MEDIDA (345X670)') == 'MTRO 2BLE MEDIDA (345X670)'
+    assert q.tipo_pieza_etiqueta('PIEZA LIBRE ENTREPAÑO') == 'ENTREPAÑO'
+    assert q.tipo_pieza_etiqueta('Pieza libre color - Costado refri') == 'Costado refri'
+    assert q.tipo_pieza_etiqueta('PIEZA LIBRE COLOR') == 'PIEZA LIBRE COLOR'     # sin descripción: tal cual
+    assert q.tipo_pieza_etiqueta('Puerta 15mm Alacena') == 'Puerta 15mm Alacena'
+    # El cruce sigue usando el nombre completo; solo cambia lo impreso, con y sin QR.
+    tipo = 'PIEZA LIBRE COLOR MTRO 2BLE MEDIDA (345X670)'
+    items = [et('CLMTRO2', tipo, 670, 345), et('CLMTRO2', tipo, 670, 345)]
+    grupos = q.cruzar(items, [pb(90, 'CLMTRO2', tipo, 670, 345)])
+    assert unico(grupos)['paginas'] == [90] and not unico(grupos)['aproximada']
+    clave = next(iter(grupos))
+    for enlaces in ({}, {clave: 'https://drive.google.com/file/d/ID/view'}):
+        html = q.generar_html_etiquetas('Lote', items, enlaces)
+        assert 'MTRO 2BLE MEDIDA (345X670)' in html and 'PIEZA LIBRE' not in html, enlaces
+
+
 if __name__ == '__main__':
     pruebas = [(n, f) for n, f in sorted(globals().items()) if n.startswith('test_') and callable(f)]
     fallos = 0

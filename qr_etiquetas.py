@@ -661,6 +661,22 @@ def _esc(v):
     return html.escape(str(v if v is not None else ''), quote=True)
 
 
+def tipo_pieza_etiqueta(tipo):
+    """Texto del tipo de pieza TAL COMO SE IMPRIME en la etiqueta: a las piezas
+    libres se les quita "PIEZA LIBRE COLOR" (o "PIEZA LIBRE") y queda solo su
+    descripción: "PIEZA LIBRE COLOR MTRO 2BLE MEDIDA (345X670)" -> "MTRO 2BLE
+    MEDIDA (345X670)". Si no trae nada más, se deja como está (no se imprime un
+    recuadro vacío). Solo cambia lo impreso: el cruce con PB usa el nombre completo.
+    Espejo de tipoPiezaEtiqueta() de la WebApp (OrdenProduccion.html)."""
+    original = str(tipo if tipo is not None else '')
+    if not re.search(r'\bPIEZA\s+LIBRE\b', original, flags=re.IGNORECASE):
+        return original                                   # el resto, intacto
+    limpio = re.sub(r'\bPIEZA\s+LIBRE(\s+COLOR)?\b', ' ', original, flags=re.IGNORECASE)
+    limpio = re.sub(r'\s{2,}', ' ', limpio)
+    limpio = re.sub(r'^[\s\-–—,:;]+|[\s\-–—,:;]+$', '', limpio)
+    return limpio or original
+
+
 def _svg_qr(url):
     return segno.make(url, error='m', micro=False).svg_inline(border=2, omitsize=True)
 
@@ -720,7 +736,7 @@ def generar_html_etiquetas(nombre_opti, items, enlaces=None, qr_mm=15):
                     f'<div class="l inv">{_esc(it["proyecto"])}</div>'
                     f'<div class="l mat">{_esc(it["material"])}</div>'
                     f'<div class="l mueble">{_esc(it["mueble"])}</div>'
-                    f'<div class="l inv">{_esc(it["tipo_pieza"])}</div>'
+                    f'<div class="l inv">{_esc(tipo_pieza_etiqueta(it["tipo_pieza"]))}</div>'
                     f'<div class="l medidas">{_esc(it["medidas"])}</div>'
                     '</div>')
         n_qr += 1
@@ -729,7 +745,7 @@ def generar_html_etiquetas(nombre_opti, items, enlaces=None, qr_mm=15):
                 _linea('inv', it['proyecto'], 8.5, True, ancho_inv) +
                 _linea('mat', it['material'], 6.5, False, ancho_txt) +
                 _linea('mueble', it['mueble'], 8.5, True, ancho_txt, dos_lineas=True) +
-                _linea('inv', it['tipo_pieza'], 8.5, True, ancho_inv, dos_lineas=True) +
+                _linea('inv', tipo_pieza_etiqueta(it['tipo_pieza']), 8.5, True, ancho_inv, dos_lineas=True) +
                 _linea('medidas', it['medidas'], 7.5, False, ancho_txt) +
                 f'</div><div class="qr">{_svg_qr(url)}</div></div>')
 

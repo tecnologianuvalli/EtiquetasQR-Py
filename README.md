@@ -101,6 +101,13 @@ Lo único agregado es `CSS_QR`: en las etiquetas con QR el texto ocupa la
 columna izquierda y el QR la derecha. En esas etiquetas, el texto que no cabe
 se reduce de tamaño; mueble y tipo de pieza pueden partirse en dos renglones.
 
+**Piezas libres:** en la etiqueta (con o sin QR) se imprime solo su
+descripción: `PIEZA LIBRE COLOR MTRO 2BLE MEDIDA (345X670)` →
+`MTRO 2BLE MEDIDA (345X670)`; también con solo `PIEZA LIBRE`. Si no trae nada
+más se imprime tal cual. Solo cambia lo impreso: el cruce con PB usa el nombre
+completo. `tipo_pieza_etiqueta()` es espejo de `tipoPiezaEtiqueta()` de la
+WebApp; si cambia una, hay que cambiar la otra.
+
 ## API (Render Web Service)
 
 - Build command: `pip install -r requirements.txt`
