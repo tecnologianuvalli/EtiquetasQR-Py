@@ -46,24 +46,42 @@ las etiquetas de la WebApp.
 
 ### Coincidencia aproximada (nombres editados al exportar)
 
-Si el nombre del mueble o de la pieza no coincide exacto (se acortó, perdió
-acentos, se abrevió o tiene una errata), se compara por palabras: las del
-nombre más corto deben aparecer, en orden, en el más largo. Ejemplo:
-`Frente Cajon EXTENSION` ~ `Frente Cajón EXTENSIÓN Vista Lluvia (inferior)`;
-`GACAJ-3C-IMP-75-70-60` ~ `GACAJ-3C-IMP-75-70-60-F15MM`.
+**Pieza.** Si el nombre no coincide exacto (se acortó, perdió acentos, se
+abrevió o tiene una errata), se compara por palabras: las del nombre más corto
+deben aparecer, en orden, en el más largo (`Frente Cajon EXTENSION` ~
+`Frente Cajón EXTENSIÓN Vista Lluvia (inferior)`), o ambos deben empezar igual
+en al menos dos palabras y la mitad del nombre (`Fondo Cajon EXTENSIÓN 50CM` ~
+`Fondo Cajon EXTENSIÓN Vista Lluvi...`).
 
-Para que nunca abra una hoja equivocada, una coincidencia aproximada solo vale si:
+**Mueble.** Al exportar se editan las medidas de su nombre (`ALMIC-2P-75-10` en
+Opticut es `ALMIC-2P-91-70-30-F15MM` en PB) y también la numeración de
+instancias (`[1]`, `[2]` en Opticut; sin número y `[1]` en PB). Lo que no cambia
+es el **código** (lo anterior a la primera medida: `ALMIC-2P`, `GACAJ-3C-EXT`).
+Si el mueble no existe con su nombre en PB, sus candidatos son los muebles de PB
+con el mismo código (o un nombre parecido), y lo eligen **todas sus piezas**:
+gana el candidato donde encajan más de ellas (nombre + medidas + espesor), y
+debe explicar al menos la mitad. Así el techo o la puerta, que delatan el ancho
+real, deciden también por los laterales, que miden igual en varios muebles.
+Si dos candidatos empatan:
 
-- **las medidas de la etiqueta son las de la hoja de PB** (Opticut y PB
-  coinciden al décimo de mm; tolerancia 0.6 mm, en cualquier orientación), y
+- si son **gemelos** (misma perforación hoja por hoja, aunque PB los numere
+  distinto) se reparten en orden: da igual cuál se enlace;
+- si no (p. ej. mismas medidas pero una puerta con bisagra y otra sin), queda
+  **sin QR** con la nota "Ambigua": no se adivina por la numeración.
+
+Para que nunca abra una hoja equivocada, toda coincidencia aproximada exige:
+
+- **las medidas y el espesor de la etiqueta son los de la hoja de PB**
+  (tolerancia 0.6 mm, en cualquier orientación: Opticut a veces redondea el
+  medio milímetro, 284 por 284.5), y
 - **queda una sola pieza de PB posible**. Si varias se parecen al nombre y
   miden igual, desempata el tablero; si tampoco, queda **sin QR** con la nota
   "Ambigua" (p. ej. `Fondo Cajon IMPAZ` con CHICO y GRANDE de 497.5 × 299).
 
 Un nombre acortado que agrupa piezas distintas (`Frente Cajon EXTENSION` para
 inferior, intermedio y superior) se reparte por medidas: cada etiqueta enlaza
-su propia hoja. Números y códigos con números son exactos (`3C` no es `2C`,
-`F15MM` no es `F18MM`) y la instancia del mueble también (`[2]` no es `[3]`).
+su propia hoja. En los códigos, números y letras son exactos (`3C` no es `2C`,
+`ALMIC-2P` no es `ALMIC-3P`).
 
 La coincidencia exacta de siempre va primero y no cambia: mismos grupos y
 mismos nombres de archivo, así que los QR ya impresos siguen sirviendo. Las

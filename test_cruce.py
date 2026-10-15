@@ -15,14 +15,16 @@ import hashlib
 import qr_etiquetas as q
 
 
-def pb(pagina, mueble, ref, alto, ancho, maquinado=True, mat='PAN-LEG-LEG-MDP-2C-SAV-1830X...'):
-    return dict(pagina=pagina, mueble=mueble, ref=ref, alto=float(alto), ancho=float(ancho),
-                maquinado=maquinado, mat=mat)
+def pb(pagina, mueble, ref, alto, ancho, maquinado=True, mat='PAN-LEG-LEG-MDP-2C-SAV-1830X...', esp=15, huella=None):
+    # huella: texto de las operaciones; por defecto, distinta por pieza y medidas (no por mueble).
+    return dict(pagina=pagina, mueble=mueble, ref=ref, alto=float(alto), ancho=float(ancho), esp=float(esp),
+                maquinado=maquinado, mat=mat, huella=huella or f'{q.norm(ref)}/{alto}x{ancho}')
 
 
-def et(mueble, tipo, largo, ancho, sku='PAN-LEG-LEG-MDP-2C-SAV-1830X2440-15-036'):
+def et(mueble, tipo, largo, ancho, sku='PAN-LEG-LEG-MDP-2C-SAV-1830X2440-15-036', espesor=15):
     return dict(tipo='pieza', proyecto='Cocina 1', material='LEGNOLAM', mueble=mueble, tipo_pieza=tipo,
-                largo=f'{largo:.2f}', ancho=f'{ancho:.2f}', medidas=f'{largo} × {ancho}', panelSKU=sku)
+                largo=f'{largo:.2f}', ancho=f'{ancho:.2f}', medidas=f'{largo} × {ancho}', panelSKU=sku,
+                espesor=f'{espesor:.2f}')
 
 
 def unico(grupos):
@@ -141,10 +143,14 @@ def test_mueble_ambiguo_lo_resuelven_las_medidas():
     assert g['paginas'] == [10]
 
 
-def test_la_instancia_del_mueble_no_se_cruza():
+def test_la_instancia_del_mueble_solo_se_cruza_si_las_piezas_lo_confirman():
+    # Opticut y PB numeran distinto las instancias ([1],[2] vs. sin número,[1]):
+    # el número no identifica; lo hacen las piezas (nombre + medidas).
     piezas = [pb(60, 'COSTADO-72-15-60[3]', 'PIEZA LIBRE COLOR', 948, 318)]
     g = unico(q.cruzar([et('COSTADO-72-15-60[2]', 'PIEZA LIBRE COLOR', 948, 318)], piezas))
-    assert g['paginas'] == [] and g['nota'].startswith('Mueble no existe en PB')
+    assert g['paginas'] == [60] and g['aproximada']
+    g = unico(q.cruzar([et('COSTADO-72-15-60[2]', 'PIEZA LIBRE COLOR', 700, 318)], piezas))
+    assert g['paginas'] == []
 
 
 # --- Reglas que siguen igual ---------------------------------------------------
@@ -171,6 +177,81 @@ def test_parecido():
     # Códigos con letras y números: exactos (3 cajones no es 2; 15 mm no es 18 mm).
     assert not q.parecido('GACAJ-3C-EXT', 'GACAJ-2C-EXT-75-70-60-F15MM')
     assert not q.parecido('Puerta F15MM', 'Puerta F18MM')
+
+
+# --- Medidas del mueble editadas al exportar (lote FOTON) ---------------------
+# En Opticut cambian los números del nombre del mueble ("ALMIC-2P-75-10" por
+# "ALMIC-2P-91-70-30-F15MM"); el código (ALMIC-2P) no. El mueble de PB se elige
+# por ese código y lo confirman sus piezas (nombre + medidas + espesor).
+ALACENA = [pb(1, 'ALMIC-2P-91-70-30-F15MM', 'Techo', 670, 299), pb(2, 'ALMIC-2P-91-70-30-F15MM', 'Suelo', 669, 449),
+           pb(3, 'ALMIC-2P-91-70-30-F15MM', 'Lateral Derecho', 789, 299), pb(4, 'ALMIC-2P-91-70-30-F15MM', 'Trasera', 869, 670)]
+
+
+def test_mueble_con_las_medidas_del_nombre_editadas():
+    items = [et('ALMIC-2P-75-10', 'Techo', 670, 299), et('ALMIC-2P-75-10', 'Trasera', 869, 670),
+             et('ALMIC-2P-75-10', 'Lateral Derecho', 789, 299)]
+    grupos = q.cruzar(items, ALACENA)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[1], [4], [3]]
+    assert all(g['aproximada'] for g in grupos.values())
+    assert q._codigo_mueble('ALMIC-2P-91-70-30-F15MM') == q._codigo_mueble('ALMIC-2P-75-10') == ('ALMIC', '2P')
+    assert q._codigo_mueble('GACAJ-3C-EXT-72-44') == ('GACAJ', '3C', 'EXT')
+
+
+def test_otro_codigo_no_se_cruza():
+    g = unico(q.cruzar([et('ALMIC-3P-75-10', 'Techo', 670, 299)], ALACENA))
+    assert g['paginas'] == [] and g['nota'].startswith('Mueble no existe en PB')
+
+
+def test_las_piezas_eligen_el_mueble_y_arrastran_las_genericas():
+    # Mismo código, dos anchos: los laterales miden igual en ambos; el techo delata cuál es.
+    piezas = [pb(10, 'GAPV-2P-72-70-60-F15MM', 'Lateral Derecho', 720, 560), pb(11, 'GAPV-2P-72-70-60-F15MM', 'Techo', 670, 560),
+              pb(20, 'GAPV-2P-72-90-60-F15MM', 'Lateral Derecho', 720, 560), pb(21, 'GAPV-2P-72-90-60-F15MM', 'Techo', 870, 560)]
+    items = [et('GAPV-2P-72-88', 'Lateral Derecho', 720, 560), et('GAPV-2P-72-88', 'Techo', 870, 560)]
+    grupos = q.cruzar(items, piezas)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[20], [21]]
+
+
+def test_gemelos_identicos_se_reparten_en_orden():
+    # Opticut los numera [1] y [2]; PB, sin número y [1]. Misma perforación hoja por hoja.
+    piezas = [pb(30, 'ALPV-2P-91-70-30-F15MM', 'Techo', 720, 299, huella='op-techo'),
+              pb(31, 'ALPV-2P-91-70-30-F15MM[1]', 'Techo', 720, 299, huella='op-techo')]
+    items = [et('ALPV-2P-81-75 [1]', 'Techo', 720, 299), et('ALPV-2P-81-75 [2]', 'Techo', 720, 299)]
+    grupos = q.cruzar(items, piezas)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[30], [31]]
+
+
+def test_muebles_iguales_por_fuera_pero_con_otra_perforacion_no_se_adivinan():
+    piezas = [pb(40, 'ALPV-2P-91-70-30-F15MM', 'Puerta 15mm Alacena', 897, 396, huella='sin bisagra'),
+              pb(41, 'ALPV-2P-91-70-30-F15MM[1]', 'Puerta 15mm Alacena', 897, 396, huella='con bisagra E D')]
+    g = unico(q.cruzar([et('ALPV-2P-81-75', 'Puerta 15mm Alacena', 897, 396)], piezas))
+    assert g['paginas'] == [] and g['nota'].startswith('Ambigua')
+
+
+def test_el_mueble_elegido_debe_explicar_la_mitad_de_sus_piezas():
+    items = [et('ALMIC-2P-75-10', 'Techo', 670, 299)] + [et('ALMIC-2P-75-10', f'Pieza rara {i}', 100 + i, 100) for i in range(3)]
+    grupos = q.cruzar(items, ALACENA)
+    assert all(g['paginas'] == [] for g in grupos.values())
+    assert 'solo 1 de sus 4 piezas' in grupos[items[0]['_grupo']]['nota']
+
+
+def test_opticut_redondea_medio_milimetro():
+    piezas = [pb(50, 'ALMIC-2P-91-70-30-F15MM', 'Estante Fijo Piso', 670, 284.5)]
+    g = unico(q.cruzar([et('ALMIC-2P-75-10', 'Estante Fijo Piso', 670, 284)], piezas))
+    assert g['paginas'] == [50]
+
+
+def test_otro_espesor_no_se_cruza():
+    g = unico(q.cruzar([et('ALMIC-2P-75-10', 'Techo', 670, 299, espesor=18)], ALACENA))
+    assert g['paginas'] == []
+
+
+def test_nombre_de_pieza_que_solo_comparte_el_inicio():
+    piezas = [pb(60, 'GACAJ-3C-EXT-72-70-60-F15MM', 'Fondo Cajon EXTENSIÓN Vista Lluvi...', 497.5, 299),
+              pb(61, 'GACAJ-3C-EXT-72-70-60-F15MM', 'Lateral Derecho', 720, 560)]
+    g = unico(q.cruzar([et('GACAJ-3C-EXT-72-44', 'Fondo Cajon EXTENSIÓN 50CM', 497.5, 299)], piezas))
+    assert g['paginas'] == [60]
+    assert q._mismo_arranque('Fondo Cajon EXTENSIÓN 50CM', 'Fondo Cajon EXTENSIÓN Vista Lluvi...')
+    assert not q._mismo_arranque('Lateral Cajon EXTENSIÓN 50CM', 'Lateral Derecho')
 
 
 if __name__ == '__main__':

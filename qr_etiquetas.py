@@ -197,7 +197,7 @@ def parsear_etiquetas_opticut(raw_text):
 # ============================================================================
 RE_PIEZA = re.compile(
     r'^(?P<ref>.+?)\s+(?P<mat>\S+)\s+Altura:\s*(?P<alto>[\d.]+)\s+Anchura:\s*(?P<ancho>[\d.]+)\s+'
-    r'Espesor:\s*[\d.]+\s+Cantidad:\s*\d+')
+    r'Espesor:\s*(?P<esp>[\d.]+)\s+Cantidad:\s*\d+')
 RE_PAGINA = re.compile(r'^P[áa]gina\s+\d+/\d+')
 
 # ¿La hoja lleva trabajo? Se decide por lo que PB dibuja en ella, sin lista de
@@ -298,6 +298,17 @@ def parecido(a, b):
     return bool(pa and pb) and (_en_orden(pa, pb) or _en_orden(pb, pa))
 
 
+def _mismo_arranque(a, b):
+    """¿Empiezan igual? Al menos 2 palabras en común al inicio y la mitad del
+    nombre más corto: "Fondo Cajon EXTENSIÓN 50CM" ~ "Fondo Cajon EXTENSIÓN
+    Vista Lluvi...". Solo se usa dentro de un mueble y con medidas iguales."""
+    pa, pb = _palabras(a), _palabras(b)
+    n = 0
+    while n < min(len(pa), len(pb)) and _palabra_coincide(pa[n], pb[n]):
+        n += 1
+    return n >= 2 and n * 2 >= min(len(pa), len(pb))
+
+
 def _mismo_nombre(csv, pb):
     """Coincidencia exacta (la de siempre): igual salvo mayúsculas, acentos,
     espacios y signos, o PB truncó con '...' y el resto coincide."""
@@ -308,14 +319,20 @@ def _mismo_nombre(csv, pb):
 
 
 def _mide_igual(it, p):
-    """¿La etiqueta (largo x ancho de Opticut) mide lo que la hoja de PB (en
-    cualquier orientación)? None si no se puede saber."""
+    """¿La etiqueta (largo x ancho y espesor de Opticut) mide lo que la hoja de PB
+    (en cualquier orientación)? None si no se puede saber. Opticut a veces
+    redondea el medio milímetro (284 por 284.5): de ahí la tolerancia."""
     try:
         l, a = float(it['largo']), float(it['ancho'])
     except (KeyError, TypeError, ValueError):
         return None
     if p.get('alto') is None:
         return None
+    try:
+        if p.get('esp') is not None and abs(float(it['espesor']) - p['esp']) > TOL_MM:
+            return False
+    except (KeyError, TypeError, ValueError):
+        pass
     return ((abs(l - p['alto']) <= TOL_MM and abs(a - p['ancho']) <= TOL_MM) or
             (abs(l - p['ancho']) <= TOL_MM and abs(a - p['alto']) <= TOL_MM))
 
@@ -334,8 +351,10 @@ def _medidas(it):
 
 
 def leer_pb(pdf):
-    """pdf: ruta o bytes. Devuelve [dict(pagina, mueble, ref, maquinado, alto, ancho, mat)].
-    alto/ancho: medidas de la pieza en mm; mat: código del tablero (PB lo trunca con "...")."""
+    """pdf: ruta o bytes. Devuelve [dict(pagina, mueble, ref, maquinado, alto, ancho, esp, mat, huella)].
+    alto/ancho/esp: medidas de la pieza en mm; mat: código del tablero (PB lo trunca con "...");
+    huella: resumen del texto de las operaciones (sin encabezado): dos hojas con la misma
+    huella llevan la misma perforación aunque sean de muebles distintos (gemelos)."""
     piezas, mueble_actual = [], None
     doc = pdfium.PdfDocument(pdf)
     try:
@@ -356,7 +375,9 @@ def leer_pb(pdf):
                 maquinado = lleva_trabajo(cuerpo[2:])
                 piezas.append(dict(pagina=num, mueble=mueble, ref=m.group('ref').strip(),
                                    maquinado=maquinado, alto=float(m.group('alto')),
-                                   ancho=float(m.group('ancho')), mat=m.group('mat')))
+                                   ancho=float(m.group('ancho')), esp=float(m.group('esp')),
+                                   mat=m.group('mat'),
+                                   huella=hashlib.sha1('\n'.join(cuerpo[2:]).encode()).hexdigest()[:12]))
             elif re.match(r'^Altura\s+[\d.]+\s*mm', cuerpo[1]):
                 mueble_actual = cuerpo[0]       # portada de mueble
     finally:
@@ -381,7 +402,7 @@ def _resolver_pieza(it, ref, candidatas, exigir_medidas):
             if not elegidas:
                 notas.append(f'«{parte}» existe en ese mueble pero no mide {_medidas(it)}')
         elif not elegidas:
-            parecidas = [p for p in candidatas if parecido(parte, p['ref'])]
+            parecidas = [p for p in candidatas if parecido(parte, p['ref']) or _mismo_arranque(parte, p['ref'])]
             if not parecidas:
                 continue
             # Una coincidencia aproximada exige que las medidas también coincidan.
@@ -410,43 +431,60 @@ def _resolver_pieza(it, ref, candidatas, exigir_medidas):
     return dict(paginas=sorted(paginas), aproximada=aproximada, nota='')
 
 
-def _resolver_etiqueta(it, por_mueble, muebles_pb):
-    """Hojas de PB de una etiqueta: primero el mueble (exacto o aproximado),
-    luego la pieza dentro de él. Devuelve dict(paginas, aproximada, nota)."""
-    mueble, ref = it['mueble'], it['tipo_pieza']
-    clave = norm(mueble)
-    if clave in por_mueble:
-        r = _resolver_pieza(it, ref, por_mueble[clave], exigir_medidas=False)
-        if not r['paginas'] and not r['nota']:
-            nombres = sorted({p['ref'] for p in por_mueble[clave]})
-            cerca = difflib.get_close_matches(ref, nombres, n=1, cutoff=0.7)
-            r['nota'] = 'Tipo de pieza no existe en ese mueble' + (f' (¿será {cerca[0]}?)' if cerca else '')
-        return r
+def _resolver_en_mueble_exacto(it, piezas_mueble):
+    """El mueble de la etiqueta existe con su nombre en PB: la de siempre."""
+    r = _resolver_pieza(it, it['tipo_pieza'], piezas_mueble, exigir_medidas=False)
+    if not r['paginas'] and not r['nota']:
+        nombres = sorted({p['ref'] for p in piezas_mueble})
+        cerca = difflib.get_close_matches(it['tipo_pieza'], nombres, n=1, cutoff=0.7)
+        r['nota'] = 'Tipo de pieza no existe en ese mueble' + (f' (¿será {cerca[0]}?)' if cerca else '')
+    return r
 
-    opciones = [k for k, nombre in muebles_pb.items() if parecido(mueble, nombre)]
-    if not opciones:
-        cerca = difflib.get_close_matches(clave, list(muebles_pb), n=1, cutoff=0.8)
-        return dict(paginas=[], aproximada=False,
-                    nota='Mueble no existe en PB' + (f' (¿será {muebles_pb[cerca[0]]}?)' if cerca else ''))
-    intentos = [(k, _resolver_pieza(it, ref, por_mueble[k], exigir_medidas=True)) for k in opciones]
-    resueltas = [(k, r) for k, r in intentos if r['paginas']]
-    if len(resueltas) == 1:
-        k, r = resueltas[0]
-        r['aproximada'] = True
-        return r
-    if resueltas:
-        nombres = ' y '.join(f'«{muebles_pb[k]}»' for k, _ in resueltas)
-        return dict(paginas=[], aproximada=False,
-                    nota=f'Ambigua: los muebles {nombres} de PB tienen esa pieza y miden {_medidas(it)}; corrige el nombre')
-    # Ningún mueble parecido la resolvió: se explica con lo que dijo cada uno.
-    if len(intentos) == 1 and intentos[0][1]['nota']:
-        k, r = intentos[0]
-        return dict(paginas=[], aproximada=False, nota=f'{r["nota"]} (mueble parecido: «{muebles_pb[k]}»)')
-    detalle = '; '.join(f'«{muebles_pb[k]}»: {r["nota"]}' for k, r in intentos if r['nota'])
-    nombres = ' y '.join(f'«{muebles_pb[k]}»' for k in opciones)
-    return dict(paginas=[], aproximada=False,
-                nota=f'El mueble se parece a {nombres} de PB' +
-                     (f' ({detalle})' if detalle else f', pero ahí no hay «{ref}» que mida {_medidas(it)}'))
+
+def _elegir_mueble(etiquetas, candidatos, por_mueble, muebles_pb):
+    """Mueble de PB para un mueble del CSV que no existe con ese nombre en PB.
+
+    Se decide con TODAS sus etiquetas: gana el candidato donde encajan más de
+    ellas (nombre de pieza + medidas + espesor). Así las piezas que delatan el
+    tamaño real (techo, suelo, puertas) eligen el mueble también para las que
+    no lo delatan (laterales iguales en varios muebles).
+
+    Devuelve dict(clave, gemelos, nota): clave del mueble elegido; gemelos = lista
+    de claves equivalentes si empatan muebles idénticos (misma perforación hoja
+    por hoja); o nota si no se puede decidir."""
+    puntos = OrderedDict()
+    for k in candidatos:
+        puntos[k] = sum(1 for it in etiquetas
+                        if _resolver_pieza(it, it['tipo_pieza'], por_mueble[k], exigir_medidas=True)['paginas'])
+    mejor = max(puntos.values()) if puntos else 0
+    nombres = lambda ks: ' y '.join(f'«{muebles_pb[k]}»' for k in ks)
+    if mejor == 0:
+        return dict(nota=f'El mueble se parece a {nombres(candidatos)} de PB, pero sus piezas no miden como ahí')
+    # El mueble elegido debe explicar al menos la mitad de sus etiquetas: si solo
+    # encajan una o dos piezas genéricas (un lateral), no es evidencia suficiente.
+    if mejor * 2 < len(etiquetas):
+        return dict(nota=f'El mueble se parece a {nombres(candidatos)} de PB, pero solo {mejor} de sus '
+                         f'{len(etiquetas)} piezas miden como ahí')
+    empatados = [k for k, v in puntos.items() if v == mejor]
+    if len(empatados) == 1:
+        return dict(clave=empatados[0], gemelos=[empatados[0]])
+    huellas = {k: sorted((norm(_sin_puntos(p['ref'])), p['alto'], p['ancho'], p['huella']) for p in por_mueble[k])
+               for k in empatados}
+    if len({tuple(h) for h in huellas.values()}) == 1:
+        return dict(clave=empatados[0], gemelos=sorted(empatados, key=lambda k: muebles_pb[k]))
+    return dict(nota=f'Ambigua: sus piezas encajan igual en {nombres(empatados)} de PB; corrige el nombre del mueble')
+
+
+def _codigo_mueble(nombre):
+    """Parte del nombre del mueble que no es medida: 'ALMIC-2P-91-70-30-F15MM' ->
+    ('ALMIC', '2P'); 'GACAJ-3C-EXT-72-70-60' -> ('GACAJ', '3C', 'EXT'). Las medidas
+    (y lo que sigue) se editan al exportar; el código no."""
+    codigo = []
+    for p in _palabras(nombre):
+        if p.isdigit() or p[0] == '#':
+            break
+        codigo.append(p)
+    return tuple(codigo)
 
 
 def cruzar(items, piezas_pb):
@@ -462,18 +500,54 @@ def cruzar(items, piezas_pb):
         por_mueble[norm(p['mueble'])].append(p)
     muebles_pb = {norm(p['mueble']): p['mueble'] for p in piezas_pb}
     por_pagina = {p['pagina']: p for p in piezas_pb}
+    piezas = [it for it in items if it['tipo'] == 'pieza']
 
-    # 1) Cada etiqueta. Las del mismo nombre, medidas y tablero resuelven igual.
-    cache, por_grupo = {}, OrderedDict()
-    for it in items:
-        if it['tipo'] != 'pieza':
+    # 1) Muebles del CSV que no existen con ese nombre en PB: se elige su mueble
+    #    de PB por parecido de nombre o por el mismo código (sin las medidas),
+    #    confirmando con las piezas. Los gemelos se reparten en orden.
+    asignado, sin_mueble, gemelos = {}, {}, defaultdict(list)
+    etiquetas_de = OrderedDict()
+    for it in piezas:
+        if norm(it['mueble']) not in por_mueble:
+            etiquetas_de.setdefault(it['mueble'], []).append(it)
+    for mueble, ets in etiquetas_de.items():
+        codigo = _codigo_mueble(mueble)
+        candidatos = [k for k, nombre in muebles_pb.items()
+                      if parecido(mueble, nombre) or (codigo and _codigo_mueble(nombre) == codigo)]
+        if not candidatos:
+            cerca = difflib.get_close_matches(norm(mueble), list(muebles_pb), n=1, cutoff=0.8)
+            sin_mueble[mueble] = 'Mueble no existe en PB' + (f' (¿será {muebles_pb[cerca[0]]}?)' if cerca else '')
             continue
+        r = _elegir_mueble(ets, candidatos, por_mueble, muebles_pb)
+        if 'nota' in r:
+            sin_mueble[mueble] = r['nota']
+        else:
+            gemelos[tuple(r['gemelos'])].append(mueble)
+    for grupo_gemelos, muebles_csv in gemelos.items():
+        for i, mueble in enumerate(sorted(muebles_csv)):
+            asignado[mueble] = grupo_gemelos[i % len(grupo_gemelos)]
+
+    # 2) Cada etiqueta. Las del mismo nombre, medidas y tablero resuelven igual.
+    cache, por_grupo = {}, OrderedDict()
+    for it in piezas:
         firma = (it['mueble'], it['tipo_pieza'], _mnum(it['largo']), _mnum(it['ancho']), it.get('panelSKU', ''))
         if firma not in cache:
-            cache[firma] = _resolver_etiqueta(it, por_mueble, muebles_pb)
+            clave = norm(it['mueble'])
+            if clave in por_mueble:
+                cache[firma] = _resolver_en_mueble_exacto(it, por_mueble[clave])
+            elif it['mueble'] in asignado:
+                r = _resolver_pieza(it, it['tipo_pieza'], por_mueble[asignado[it['mueble']]], exigir_medidas=True)
+                if r['paginas']:
+                    r['aproximada'] = True
+                elif not r['nota']:
+                    r['nota'] = (f'Su mueble es «{muebles_pb[asignado[it["mueble"]]]}» en PB, '
+                                 f'pero ahí no hay «{it["tipo_pieza"]}» que mida {_medidas(it)}')
+                cache[firma] = r
+            else:
+                cache[firma] = dict(paginas=[], aproximada=False, nota=sin_mueble[it['mueble']])
         por_grupo.setdefault((it['mueble'], it['tipo_pieza']), []).append((it, cache[firma]))
 
-    # 2) Grupos. Lo normal es que todo el grupo resuelva igual: misma clave y
+    # 3) Grupos. Lo normal es que todo el grupo resuelva igual: misma clave y
     #    mismo nombre de archivo que antes (los QR ya impresos siguen sirviendo).
     grupos = OrderedDict()
     for (mueble, ref), lista in por_grupo.items():
