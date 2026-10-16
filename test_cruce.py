@@ -103,7 +103,10 @@ def test_partes_con_coma_aproximadas():
 # --- Nunca se adivina ----------------------------------------------------------
 def test_aproximada_con_otras_medidas_no_enlaza():
     g = unico(q.cruzar([et(CAJONERO, 'Frente Cajon EXTENSION', 500, 356)], FRENTES))
-    assert g['paginas'] == [] and not g['excluida'] and g['nota'].startswith('Parecida a')
+    assert g['paginas'] == [] and not g['excluida']
+    # La nota dice que es por MEDIDAS y cuáles (las de la pieza, no las del nombre del mueble).
+    assert g['nota'] == ('«Frente Cajon EXTENSION» mide 500 × 356 y en PB '
+                         '«Frente Cajon EXTENSIÓN Vista Lluvia (inferior)» mide 338 × 356'), g['nota']
 
 
 def test_ambigua_si_dos_piezas_se_parecen_y_miden_igual():
@@ -317,6 +320,122 @@ def test_varios_pdf_y_un_solo_pdf_dan_lo_mismo_si_el_nombre_es_unico():
     a = unico(q.cruzar([et('GAPV-2P-72-70-60-F15MM', 'Techo', 850, 119)], solo))
     b = unico(q.cruzar([et('GAPV-2P-72-70-60-F15MM', 'Techo', 850, 119)], varios))
     assert a['paginas'] == [3] and b['paginas'] == [CL03 + 3] and a['codigo'] == b['codigo']
+
+
+# --- Piezas libres de PB ("PIEZA LIBRE COLOR"): se reconocen por medidas ------
+# PB les pone un nombre genérico; en Opticut llevan su nombre real ("Costado").
+def test_pieza_libre_se_reconoce_por_medidas_y_espesor():
+    piezas = [pb(70, 'CLCOST-210-1.5-45', 'PIEZA LIBRE COLOR', 2034, 499),
+              pb(71, 'CLCOST-210-1.5-45[1]', 'PIEZA LIBRE COLOR', 2034, 449)]
+    items = [et('CLCOST-2035 [1]', 'Costado', 2034, 499), et('CLCOST-2035 [2]', 'Costado', 2034, 449)]
+    grupos = q.cruzar(items, piezas)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[70], [71]]
+    assert all(g['aproximada'] for g in grupos.values())
+    # También dentro de un mueble que existe con su nombre.
+    g = unico(q.cruzar([et('COSTADO-72-15-60', 'Costado refri', 948, 318)],
+                       [pb(72, 'COSTADO-72-15-60', 'PIEZA LIBRE COLOR', 948, 318)]))
+    assert g['paginas'] == [72]
+
+
+def test_pieza_libre_sin_perforacion_sale_excluida_no_sin_enlace():
+    g = unico(q.cruzar([et('CLCOST-2035 [1]', 'Costado', 2034, 499)],
+                       [pb(70, 'CLCOST-210-1.5-45', 'PIEZA LIBRE COLOR', 2034, 499, maquinado=False)]))
+    assert g['excluida'] and g['nota'].startswith('Excluida')
+
+
+def test_pieza_libre_con_otras_medidas_o_espesor_no_enlaza():
+    piezas = [pb(70, 'COSTADO-72-15-60', 'PIEZA LIBRE COLOR', 948, 318)]
+    assert unico(q.cruzar([et('COSTADO-72-15-60', 'Costado', 900, 318)], piezas))['paginas'] == []
+    assert unico(q.cruzar([et('COSTADO-72-15-60', 'Costado', 948, 318, espesor=18)], piezas))['paginas'] == []
+
+
+def test_si_hay_una_pieza_que_se_llama_parecido_no_se_usa_la_libre():
+    # "Suelo" de PB mide otra cosa (otra versión del diseño): no se toma la pieza libre
+    # que casualmente mide como la etiqueta.
+    piezas = [pb(80, 'CLCAJ-4C-220-60-60-F15MM', 'Suelo', 570, 599),
+              pb(81, 'CLCAJ-4C-220-60-60-F15MM', 'PIEZA LIBRE COLOR', 570, 579)]
+    # Mueble aproximado (medidas exigidas): el Suelo no mide igual y la libre no se usa.
+    g = unico(q.cruzar([et('CLCAJ-4C-205-60', 'Suelo', 570, 579)], piezas))
+    assert g['paginas'] == [] and '«Suelo» mide 570 × 579 y en PB «Suelo» mide 570 × 599' in g['nota'], g['nota']
+    # Nombre parecido (no exacto) que mide otra cosa: tampoco se toma la libre.
+    g = unico(q.cruzar([et('CLCAJ-4C-220-60-60-F15MM', 'Suelo Cajonero', 570, 579)], piezas))
+    assert g['paginas'] == [], g
+    # Mueble con su nombre exacto: como siempre, el nombre exacto enlaza el Suelo (nunca la libre).
+    g = unico(q.cruzar([et('CLCAJ-4C-220-60-60-F15MM', 'Suelo', 570, 579)], piezas))
+    assert g['paginas'] == [80]
+
+
+def test_dos_piezas_libres_iguales_por_fuera_y_distinta_perforacion_es_ambigua():
+    piezas = [pb(90, 'COSTADO-72-15-60', 'PIEZA LIBRE COLOR', 948, 318, huella='a'),
+              pb(91, 'COSTADO-72-15-60', 'PIEZA LIBRE COLOR', 948, 318, huella='b')]
+    g = unico(q.cruzar([et('COSTADO-72-15-60', 'Costado', 948, 318)], piezas))
+    assert g['paginas'] == [] and g['nota'].startswith('Ambigua')
+
+
+# --- Mensajes: si falló el nombre o las medidas, y cuáles ----------------------
+def test_mensaje_cuando_el_nombre_no_se_parece_pero_mide_igual():
+    piezas = [pb(1, 'GACAJ-3C-EXT-72-70-60-F15MM', 'Lateral Derecho', 720, 560)]
+    g = unico(q.cruzar([et('GACAJ-3C-EXT-72-44', 'Costado', 720, 560)], piezas))
+    assert g['paginas'] == []
+    assert '«Costado» mide igual que «Lateral Derecho» de PB, pero el nombre no se parece' in g['nota'], g['nota']
+
+
+def test_mensaje_cuando_solo_cambia_el_espesor():
+    piezas = [pb(1, 'GACAJ-3C-EXT-72-70-60-F15MM', 'Techo', 670, 560)]
+    g = unico(q.cruzar([et('GACAJ-3C-EXT-72-70-60-F15MM', 'Techo X', 670, 560, espesor=18)], piezas))
+    assert '«Techo X» es de 18 mm y en PB «Techo» de 15 mm' in g['nota'], g['nota']
+
+
+def test_mensaje_del_mueble_dice_cual_y_por_que_con_ejemplos():
+    piezas = [pb(i + 1, 'CLCAJ-4C-220-60-60-F15MM', ref, alto, ancho) for i, (ref, alto, ancho) in enumerate(
+        [('Lateral Derecho', 2049, 599), ('Suelo', 570, 599), ('Frente Cajon EXTENSIÓN Vista Lluvi...', 189, 596)])]
+    items = [et('CLCAJ-4C-205-60', 'Frente Cajon Vista Lluvia 45', 189, 596),
+             et('CLCAJ-4C-205-60', 'Lateral Derecho', 2049, 579),
+             et('CLCAJ-4C-205-60', 'Suelo', 570, 579)]
+    nota = q.cruzar(items, piezas)[('CLCAJ-4C-205-60', 'Suelo')]['nota']
+    assert nota.startswith('El mueble se parece a «CLCAJ-4C-220-60-60-F15MM» de PB, pero solo 1 de sus 3 piezas encajan ahí'), nota
+    assert '«Lateral Derecho» mide 2049 × 579 y en PB «Lateral Derecho» mide 2049 × 599' in nota, nota
+
+
+def test_codigo_que_es_el_inicio_del_otro():
+    assert q._codigo_compatible(('VISTA', 'INF'), ('VISTA',))
+    assert not q._codigo_compatible(('GA', 'X'), ('GA',))              # "GA" sola no dice nada
+    assert not q._codigo_compatible(('CLCAJ', '4C'), ('CLCAJ', '4C1P'))  # 4 cajones no es 4 cajones + puerta
+    # "VISTA INF" en Opticut encuentra su vista libre "VISTA-10-120-1.5" en PB, por medidas.
+    piezas = [pb(10, 'VISTA-10-120-1.5', 'PIEZA LIBRE COLOR', 49, 2210, pdf=1, proyecto='Closet 03'),
+              pb(20, 'VISTA-10-120-1.5', 'PIEZA LIBRE COLOR', 49, 1730, pdf=2, proyecto='Closet 04')]
+    items = [et('VISTA INF', 'Vista Inferior', 49, 2210, proyecto='CLOSET-03 D203'),
+             et('VISTA INF', 'Vista Inferior', 49, 1730, proyecto='CLOSET-04 D203')]
+    grupos = q.cruzar(items, piezas)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[10], [20]]
+
+
+def test_un_mueble_del_csv_que_junta_piezas_libres_de_varios_muebles_de_pb():
+    # "COSTADO REFRI" agrupa dos costados que en PB son dos muebles: cada etiqueta va al suyo.
+    piezas = [pb(30, 'COSTADO-72-15-60', 'PIEZA LIBRE COLOR', 648, 2298),
+              pb(31, 'COSTADO-72-15-60[1]', 'PIEZA LIBRE COLOR', 98, 498)]
+    items = [et('COSTADO REFRI', 'Costado Refri', 648, 2298), et('COSTADO REFRI', 'Costado Refri', 98, 498)]
+    grupos = q.cruzar(items, piezas)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[30], [31]]
+
+
+def test_una_pieza_con_nombre_no_se_enlaza_sola_si_su_mueble_no_encaja():
+    # El frente mide igual en PB, pero el resto del cajonero no: otra versión del diseño.
+    piezas = [pb(1, 'CLCAJ-4C-220-60-60-F15MM', 'Frente Cajon EXTENSIÓN Vista Lluvi...', 189, 596),
+              pb(2, 'CLCAJ-4C-220-60-60-F15MM', 'Lateral Derecho', 2049, 599),
+              pb(3, 'CLCAJ-4C-220-60-60-F15MM', 'Suelo', 570, 599)]
+    items = [et('CLCAJ-4C-205-60', 'Frente Cajon Vista Lluvia 45', 189, 596),
+             et('CLCAJ-4C-205-60', 'Lateral Derecho', 2049, 579), et('CLCAJ-4C-205-60', 'Suelo', 570, 579)]
+    grupos = q.cruzar(items, piezas)
+    assert all(g['paginas'] == [] for g in grupos.values())
+
+
+def test_notas_en_singular_y_con_la_pieza_libre_mas_parecida():
+    piezas = [pb(40, 'CLSUELO-0.6-200-60', 'PIEZA LIBRE COLOR', 599, 2030)]
+    g = unico(q.cruzar([et('CLSUELO [1]', 'Suelo', 599, 2000)], piezas))
+    assert g['paginas'] == []
+    assert 'pero su única pieza no encaja ahí' in g['nota'], g['nota']
+    assert '«Suelo» mide 599 × 2000 y la pieza libre de PB más parecida mide 599 × 2030' in g['nota'], g['nota']
 
 
 if __name__ == '__main__':

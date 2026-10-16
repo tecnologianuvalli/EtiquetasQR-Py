@@ -436,6 +436,41 @@ def _paginas_txt(paginas, por_pagina, varios):
 # ============================================================================
 # 3) Cruce mueble + tipo de pieza
 # ============================================================================
+def _es_pieza_libre(ref):
+    """Pieza libre de PB: nombre genérico ("PIEZA LIBRE COLOR"); en Opticut se le pone su nombre real."""
+    return bool(re.search(r'\bPIEZA\s+LIBRE\b', ref or '', flags=re.IGNORECASE))
+
+
+def _distancia(it, p):
+    try:
+        l, a = float(it['largo']), float(it['ancho'])
+    except (KeyError, TypeError, ValueError):
+        return float('inf')
+    return min(abs(l - p['alto']) + abs(a - p['ancho']), abs(l - p['ancho']) + abs(a - p['alto']))
+
+
+def _motivo(it, parte, candidatas):
+    """Por qué la etiqueta no encaja en ese mueble de PB, en una frase: si es el
+    NOMBRE o las MEDIDAS (las reales de la pieza: largo x ancho x espesor del CSV
+    contra Altura x Anchura x Espesor de la hoja de PB; nunca las del nombre del mueble)."""
+    por_nombre = [p for p in candidatas
+                  if _mismo_nombre(parte, p['ref']) or parecido(parte, p['ref']) or _mismo_arranque(parte, p['ref'])]
+    if por_nombre:
+        p = min(por_nombre, key=lambda x: _distancia(it, x))
+        if _distancia(it, p) <= 2 * TOL_MM:
+            return f'«{parte}» es de {_mnum(it.get("espesor"))} mm y en PB «{p["ref"]}» de {p["esp"]:g} mm'
+        return f'«{parte}» mide {_medidas(it)} y en PB «{p["ref"]}» mide {p["alto"]:g} × {p["ancho"]:g}'
+    igual = [p for p in candidatas if _mide_igual(it, p)]
+    if igual:
+        return f'«{parte}» mide igual que «{igual[0]["ref"]}» de PB, pero el nombre no se parece'
+    libres = [p for p in candidatas if _es_pieza_libre(p['ref'])]
+    if libres:
+        p = min(libres, key=lambda x: _distancia(it, x))
+        if _distancia(it, p) <= 100:
+            return f'«{parte}» mide {_medidas(it)} y la pieza libre de PB más parecida mide {p["alto"]:g} × {p["ancho"]:g}'
+    return f'en PB no hay «{parte}» ni otra pieza de {_medidas(it)}'
+
+
 def _resolver_pieza(it, ref, candidatas, exigir_medidas):
     """Hojas de PB de la pieza `ref` dentro de un mueble (candidatas), para la
     etiqueta `it`. Devuelve dict(paginas, aproximada, nota). Cada parte de
@@ -448,17 +483,24 @@ def _resolver_pieza(it, ref, candidatas, exigir_medidas):
             # El mueble se encontró por aproximación: las medidas confirman.
             elegidas = [p for p in elegidas if _mide_igual(it, p) is not False]
             if not elegidas:
-                notas.append(f'«{parte}» existe en ese mueble pero no mide {_medidas(it)}')
+                notas.append(_motivo(it, parte, candidatas))
         elif not elegidas:
             parecidas = [p for p in candidatas if parecido(parte, p['ref']) or _mismo_arranque(parte, p['ref'])]
-            if not parecidas:
-                continue
             # Una coincidencia aproximada exige que las medidas también coincidan.
             elegidas = [p for p in parecidas if _mide_igual(it, p) is not False]
+            if not parecidas:
+                # Pieza libre de PB ("PIEZA LIBRE COLOR"): en Opticut lleva su nombre real
+                # ("Costado"), así que se reconoce por medidas y espesor dentro de su mueble.
+                # Solo si ninguna pieza se llama parecido: si hay un "Suelo" que mide otra
+                # cosa, no se toma una pieza libre que casualmente mida igual.
+                elegidas = [p for p in candidatas if _es_pieza_libre(p['ref']) and _mide_igual(it, p) is True]
+                if len({p['huella'] for p in elegidas}) > 1:
+                    notas.append(f'Ambigua: varias piezas libres de PB miden {_medidas(it)} y perforan distinto; '
+                                 'corrige el nombre')
+                    continue
             if not elegidas:
-                ej = parecidas[0]
-                notas.append(f'Parecida a «{ej["ref"]}» de PB, pero la etiqueta mide {_medidas(it)} '
-                             f'y la hoja {ej["alto"]:g} × {ej["ancho"]:g}')
+                if parecidas or any(_mide_igual(it, p) for p in candidatas):
+                    notas.append(_motivo(it, parte, candidatas))
                 continue
             refs = OrderedDict((norm(_sin_puntos(p['ref'])), p['ref']) for p in elegidas)
             if len(refs) > 1:
@@ -511,13 +553,30 @@ def _elegir_mueble(etiquetas, candidatos, por_mueble, muebles_pb, proyecto_csv='
                         if _resolver_pieza(it, it['tipo_pieza'], por_mueble[k], exigir_medidas=True)['paginas'])
     mejor = max(puntos.values()) if puntos else 0
     nombres = lambda ks: ' y '.join(f'«{muebles_pb[k]}»' for k in ks)
-    if mejor == 0:
-        return dict(nota=f'El mueble se parece a {nombres(candidatos)} de PB, pero sus piezas no miden como ahí')
     # El mueble elegido debe explicar al menos la mitad de sus etiquetas: si solo
     # encajan una o dos piezas genéricas (un lateral), no es evidencia suficiente.
-    if mejor * 2 < len(etiquetas):
-        return dict(nota=f'El mueble se parece a {nombres(candidatos)} de PB, pero solo {mejor} de sus '
-                         f'{len(etiquetas)} piezas miden como ahí')
+    # "Encajar" = nombre de pieza parecido + mismas medidas reales y espesor.
+    if mejor == 0 or mejor * 2 < len(etiquetas):
+        # Para explicar, el candidato del mismo proyecto y con la pieza más parecida.
+        mejores = [k for k, v in puntos.items() if v == mejor]
+        del_proyecto = lambda k: bool(proyecto_csv and proyecto_pb.get(k) and parecido(proyecto_csv, proyecto_pb[k]))
+        cercania = lambda k: min((_distancia(it, x) for it in etiquetas for x in por_mueble[k]), default=float('inf'))
+        k = min(mejores, key=lambda k: (not del_proyecto(k), cercania(k)))
+        otros = len(candidatos) - 1
+        ejemplos, vistos = [], set()
+        for it in etiquetas:
+            parte = it['tipo_pieza'].split(',')[0].strip()
+            if len(ejemplos) == 2 or parte in vistos:
+                continue
+            vistos.add(parte)
+            if not _resolver_pieza(it, it['tipo_pieza'], por_mueble[k], exigir_medidas=True)['paginas']:
+                ejemplos.append(_motivo(it, parte, por_mueble[k]))
+        cuantas = ('su única pieza no encaja ahí' if len(etiquetas) == 1 else
+                   f'ninguna de sus {len(etiquetas)} piezas encaja ahí' if mejor == 0 else
+                   f'solo {mejor} de sus {len(etiquetas)} piezas encajan ahí')
+        return dict(nota=f'El mueble se parece a «{muebles_pb[k]}»' + (f' (y {otros} más)' if otros else '') +
+                         f' de PB, pero {cuantas}' + ('. Ej.: ' + '; '.join(ejemplos) if ejemplos else ''),
+                    por_etiqueta=_libres_por_etiqueta(etiquetas, candidatos, por_mueble, proyecto_csv, proyecto_pb))
     empatados = [k for k, v in puntos.items() if v == mejor]
     if len(empatados) > 1 and proyecto_csv:
         del_proyecto = [k for k in empatados if proyecto_pb.get(k) and parecido(proyecto_csv, proyecto_pb[k])]
@@ -529,7 +588,53 @@ def _elegir_mueble(etiquetas, candidatos, por_mueble, muebles_pb, proyecto_csv='
                for k in empatados}
     if len({tuple(h) for h in huellas.values()}) == 1:
         return dict(clave=empatados[0], gemelos=sorted(empatados, key=lambda k: muebles_pb[k]))
-    return dict(nota=f'Ambigua: sus piezas encajan igual en {nombres(empatados)} de PB; corrige el nombre del mueble')
+    return dict(nota=f'Ambigua: sus piezas encajan igual en {nombres(empatados)} de PB; corrige el nombre del mueble',
+                por_etiqueta=_libres_por_etiqueta(etiquetas, candidatos, por_mueble, proyecto_csv, proyecto_pb))
+
+
+def _firma_etiqueta(it):
+    """Etiquetas con el mismo proyecto, nombre, medidas y tablero se resuelven igual."""
+    return (it['proyecto'], it['mueble'], it['tipo_pieza'], _mnum(it['largo']), _mnum(it['ancho']),
+            it.get('panelSKU', ''))
+
+
+def _libres_por_etiqueta(etiquetas, candidatos, por_mueble, proyecto_csv='', proyecto_pb=None):
+    """Piezas libres de un mueble del CSV que ningún mueble de PB explica entero:
+    en Opticut a veces se agrupan bajo un nombre ("COSTADO REFRI") piezas libres que
+    en PB son muebles separados (COSTADO-72-15-60 y COSTADO-72-15-60[1]). Cada
+    etiqueta va a su propio mueble si, por medidas y espesor, su pieza libre está en
+    UNO solo de los candidatos (con empate: el del proyecto, o gemelos idénticos).
+    Solo piezas libres: una pieza con nombre (un frente) que mide igual en otro mueble
+    no basta para enlazarla sin el resto de su mueble. Devuelve {firma: clave}."""
+    proyecto_pb = proyecto_pb or {}
+    asignadas = {}
+    for it in etiquetas:
+        donde, huellas = [], set()
+        for k in candidatos:
+            r = _resolver_pieza(it, it['tipo_pieza'], por_mueble[k], exigir_medidas=True)
+            hojas = [p for p in por_mueble[k] if p['pagina'] in r['paginas']]
+            if hojas and all(_es_pieza_libre(p['ref']) for p in hojas):
+                donde.append(k)
+                huellas.add(tuple(sorted(p['huella'] for p in hojas)))
+        if len(donde) > 1 and proyecto_csv:
+            del_proyecto = [k for k in donde if proyecto_pb.get(k) and parecido(proyecto_csv, proyecto_pb[k])]
+            if len(del_proyecto) == 1:
+                donde = del_proyecto
+        if len(donde) == 1 or (donde and len(huellas) == 1):
+            asignadas[_firma_etiqueta(it)] = donde[0]
+    return asignadas
+
+
+def _codigo_compatible(a, b):
+    """Mismo código de mueble, o uno es el inicio del otro (palabra por palabra):
+    "VISTA INF" en Opticut ~ "VISTA-10-120-1.5" en PB. El más corto debe decir algo:
+    dos palabras, o una de 4 letras o más. Siempre lo confirman las piezas."""
+    if not a or not b:
+        return False
+    corto, largo = (a, b) if len(a) <= len(b) else (b, a)
+    if largo[:len(corto)] != corto:
+        return False
+    return len(corto) >= 2 or len(corto[0]) >= 4
 
 
 def _codigo_mueble(nombre):
@@ -576,7 +681,7 @@ def cruzar(items, piezas_pb):
     #    los parecidos / del mismo código (sin las medidas). Se decide por mueble
     #    Y proyecto del CSV: en un nivel, "VISTA INF" del closet 03 y del 04 son
     #    piezas distintas. Los gemelos se reparten en orden.
-    asignado, sin_mueble, gemelos = {}, {}, defaultdict(list)
+    asignado, sin_mueble, gemelos, por_etiqueta = {}, {}, defaultdict(list), {}
     etiquetas_de = OrderedDict()
     for it in piezas:
         if len(por_nombre.get(norm(it['mueble']), [])) != 1:
@@ -586,7 +691,7 @@ def cruzar(items, piezas_pb):
         if not candidatos:
             codigo = _codigo_mueble(mueble)
             candidatos = [k for k, nombre in nombre_pb.items()
-                          if parecido(mueble, nombre) or (codigo and _codigo_mueble(nombre) == codigo)]
+                          if parecido(mueble, nombre) or _codigo_compatible(codigo, _codigo_mueble(nombre))]
         if not candidatos:
             cerca = difflib.get_close_matches(norm(mueble), sorted({k[1] for k in nombre_pb}), n=1, cutoff=0.8)
             sugerido = next((nombre_pb[k] for k in nombre_pb if cerca and k[1] == cerca[0]), '')
@@ -595,6 +700,7 @@ def cruzar(items, piezas_pb):
         r = _elegir_mueble(ets, candidatos, por_mueble, muebles_pb, proyecto, proyecto_pb)
         if 'nota' in r:
             sin_mueble[(proyecto, mueble)] = r['nota']
+            por_etiqueta.update(r.get('por_etiqueta', {}))
         else:
             gemelos[tuple(r['gemelos'])].append((proyecto, mueble))
     for grupo_gemelos, muebles_csv in gemelos.items():
@@ -604,8 +710,7 @@ def cruzar(items, piezas_pb):
     # 2) Cada etiqueta. Las del mismo proyecto, nombre, medidas y tablero resuelven igual.
     cache, por_grupo = {}, OrderedDict()
     for it in piezas:
-        firma = (it['proyecto'], it['mueble'], it['tipo_pieza'], _mnum(it['largo']), _mnum(it['ancho']),
-                 it.get('panelSKU', ''))
+        firma = _firma_etiqueta(it)
         if firma not in cache:
             exactos = por_nombre.get(norm(it['mueble']), [])
             clave_csv = (it['proyecto'], it['mueble'])
@@ -619,8 +724,15 @@ def cruzar(items, piezas_pb):
                     # exacto y las piezas eligieron el PDF.
                     r['aproximada'] = r['aproximada'] or not exactos
                 elif not r['nota']:
-                    r['nota'] = (f'Su mueble es «{muebles_pb[k]}» en PB, '
-                                 f'pero ahí no hay «{it["tipo_pieza"]}» que mida {_medidas(it)}')
+                    r['nota'] = (f'Su mueble es «{muebles_pb[k]}» en PB, pero ahí no hay '
+                                 f'«{it["tipo_pieza"]}» ni otra pieza de {_medidas(it)}')
+                else:
+                    r['nota'] = f'Su mueble es «{muebles_pb[k]}» en PB, pero {r["nota"]}'
+                cache[firma] = r
+            elif firma in por_etiqueta:
+                # Pieza libre que se encontró sola en un mueble de PB (ver _libres_por_etiqueta).
+                r = _resolver_pieza(it, it['tipo_pieza'], por_mueble[por_etiqueta[firma]], exigir_medidas=True)
+                r['aproximada'] = True
                 cache[firma] = r
             else:
                 cache[firma] = dict(paginas=[], aproximada=False, nota=sin_mueble[clave_csv])

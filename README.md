@@ -109,6 +109,36 @@ varios PDF a la vez (`pdf_pb`, `pdf_pb_2`, `pdf_pb_3`…; hasta 12).
 - Un PDF subido dos veces se ignora. Con un solo PDF todo queda igual que antes
   (mismas hojas y mismos nombres de archivo).
 
+### Piezas libres de PolyBoard
+
+PB llama a las piezas libres con un nombre genérico (`PIEZA LIBRE COLOR`); en
+Opticut llevan su nombre real (`Costado`, `Vista Inferior`). Por eso se
+reconocen por **medidas y espesor** dentro de su mueble, aunque el nombre no se
+parezca, y solo si ninguna otra pieza del mueble se llama parecido. Si dos piezas
+libres miden igual y perforan distinto, queda "Ambigua". Si en Opticut un mueble
+agrupa piezas libres que en PB son muebles separados (`COSTADO REFRI` → dos
+`COSTADO-…`), cada etiqueta va a su propio mueble cuando sus medidas lo señalan en
+uno solo. Una pieza libre sin perforación sale **EXCLUIDA**, no como error.
+
+El código del mueble también se acepta cuando uno es el inicio del otro, palabra
+por palabra (`VISTA INF` ~ `VISTA-10-120-1.5`), siempre confirmado por las piezas.
+
+### Qué dice cada nota
+
+"Medir" siempre es la **medida real de la pieza**: largo × ancho × espesor de la
+etiqueta contra Altura × Anchura × Espesor de la hoja de PB (los números del
+nombre del mueble nunca se usan para medir). "Encajar" es nombre parecido +
+mismas medidas.
+
+- `«Lateral Derecho» mide 2049 × 579 y en PB «Lateral Derecho» mide 2049 × 599`:
+  la pieza existe, pero mide distinto (otra versión del diseño).
+- `«Costado» mide igual que «Lateral» de PB, pero el nombre no se parece`.
+- `«Suelo» mide 599 × 2000 y la pieza libre de PB más parecida mide 599 × 2030`.
+- `El mueble se parece a «X» de PB, pero solo 9 de sus 37 piezas encajan ahí`:
+  para elegir un mueble por aproximación tiene que encajar al menos la mitad de
+  sus piezas; si no, ninguna lleva QR (y la nota da ejemplos de las que no encajan).
+- `Mueble no existe en PB`: ni el nombre ni el código del mueble aparecen en ningún PDF.
+
 La coincidencia exacta de siempre va primero y no cambia: mismos grupos y
 mismos nombres de archivo, así que los QR ya impresos siguen sirviendo. Las
 aproximadas salen en el reporte como `OK (aproximado)` con la pieza de PB con
