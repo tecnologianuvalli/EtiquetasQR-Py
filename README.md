@@ -21,6 +21,7 @@ pip install -r requirements.txt
 
 ```
 python qr_etiquetas.py PB.pdf etiquetas.csv                        # hojas + reporte
+python qr_etiquetas.py CL03.pdf CL04.pdf CL05.pdf etiquetas.csv    # un nivel: varios PDF
 python qr_etiquetas.py PB.pdf etiquetas.csv --demo                 # QR de prueba
 python qr_etiquetas.py PB.pdf etiquetas.csv --enlaces enlaces.csv  # enlaces de Drive (archivo;url)
 python qr_etiquetas.py PB.pdf etiquetas.csv --base-url https://qr.nuvalli.com/h/
@@ -83,6 +84,31 @@ inferior, intermedio y superior) se reparte por medidas: cada etiqueta enlaza
 su propia hoja. En los códigos, números y letras son exactos (`3C` no es `2C`,
 `ALMIC-2P` no es `ALMIC-3P`).
 
+### Varios PDF de PolyBoard (un corte por nivel)
+
+A producción se manda un corte por nivel y por prototipo: todas las cocinas,
+todos los closets… Un departamento suele tener dos o tres closets distintos y
+cada uno es un proyecto de PB con su PDF, así que un mismo CSV se cruza con
+varios PDF a la vez (`pdf_pb`, `pdf_pb_2`, `pdf_pb_3`…; hasta 12).
+
+- Cada mueble de PB se identifica por **PDF + nombre**: dos closets pueden tener
+  un mueble que se llama igual con piezas distintas (`VISTA-10-120-1.5`,
+  `CLMTRO2-03-200-60`…). Si el nombre del CSV existe en un solo PDF, se cruza
+  como siempre; si existe en varios, lo eligen las piezas (medidas y espesor),
+  igual que con un nombre aproximado.
+- Se decide por mueble **y proyecto del CSV**: en un nivel, el "VISTA INF" del
+  closet 03 y el del 04 son piezas distintas.
+- Si aun así empatan, desempata el proyecto: cuando solo uno de los PDF se
+  llama como el de las etiquetas (`CLOSET-03 D203` ~ el encabezado `Closet 03`
+  de PB). Si son gemelos (misma perforación hoja por hoja), da igual cuál. Si
+  no, "Ambigua".
+- El reporte dice de qué PDF es cada hoja (`Closet 03: 12 13`) y
+  `resumen.pdfs` cuántas etiquetas cubrió cada uno. **Un PDF con 0 etiquetas casi
+  seguro es de otro proyecto o de otra versión del diseño** (otro fondo, otras
+  correderas): la WebApp lo avisa.
+- Un PDF subido dos veces se ignora. Con un solo PDF todo queda igual que antes
+  (mismas hojas y mismos nombres de archivo).
+
 La coincidencia exacta de siempre va primero y no cambia: mismos grupos y
 mismos nombres de archivo, así que los QR ya impresos siguen sirviendo. Las
 aproximadas salen en el reporte como `OK (aproximado)` con la pieza de PB con
@@ -120,8 +146,8 @@ Todas las llamadas, menos `/salud`, llevan el header `X-API-Key`.
 | Endpoint | Entrada (multipart) | Salida (JSON) |
 |---|---|---|
 | `GET /salud` | — | `{"ok": true}` |
-| `POST /procesar` | `pdf_pb`, `csv_etiquetas`, `nombre`, `formato` (opcional) | `resumen`, `reporte`, `hojas: [{archivo, mime, base64}]` |
-| `POST /etiquetas` | `pdf_pb`, `csv_etiquetas`, `nombre`, `enlaces` (JSON `{archivo: url}`), `qr_mm` (opcional) | `resumen`, `html` |
+| `POST /procesar` | `pdf_pb` (y `pdf_pb_2`, `pdf_pb_3`… con varios), `csv_etiquetas`, `nombre`, `formato` (opcional) | `resumen`, `reporte`, `hojas: [{archivo, mime, base64}]` |
+| `POST /etiquetas` | `pdf_pb` (y `pdf_pb_2`…), `csv_etiquetas`, `nombre`, `enlaces` (JSON `{archivo: url}`), `qr_mm` (opcional) | `resumen`, `html` |
 
 El servicio no guarda nada entre llamadas. Flujo: `/procesar` → quien llama
 sube las hojas y obtiene sus enlaces → `/etiquetas` con esos enlaces.

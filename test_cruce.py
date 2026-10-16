@@ -15,14 +15,17 @@ import hashlib
 import qr_etiquetas as q
 
 
-def pb(pagina, mueble, ref, alto, ancho, maquinado=True, mat='PAN-LEG-LEG-MDP-2C-SAV-1830X...', esp=15, huella=None):
+def pb(pagina, mueble, ref, alto, ancho, maquinado=True, mat='PAN-LEG-LEG-MDP-2C-SAV-1830X...', esp=15, huella=None,
+       pdf=0, proyecto=''):
     # huella: texto de las operaciones; por defecto, distinta por pieza y medidas (no por mueble).
-    return dict(pagina=pagina, mueble=mueble, ref=ref, alto=float(alto), ancho=float(ancho), esp=float(esp),
+    # pdf/proyecto: de qué PDF de PB viene (varios PDF en un nivel); pagina debe ser única entre todos.
+    return dict(pagina=pagina, local=pagina % q.PAGINAS_POR_PDF, pdf=pdf, proyecto=proyecto, mueble=mueble, ref=ref,
+                alto=float(alto), ancho=float(ancho), esp=float(esp),
                 maquinado=maquinado, mat=mat, huella=huella or f'{q.norm(ref)}/{alto}x{ancho}')
 
 
-def et(mueble, tipo, largo, ancho, sku='PAN-LEG-LEG-MDP-2C-SAV-1830X2440-15-036', espesor=15):
-    return dict(tipo='pieza', proyecto='Cocina 1', material='LEGNOLAM', mueble=mueble, tipo_pieza=tipo,
+def et(mueble, tipo, largo, ancho, sku='PAN-LEG-LEG-MDP-2C-SAV-1830X2440-15-036', espesor=15, proyecto='Cocina 1'):
+    return dict(tipo='pieza', proyecto=proyecto, material='LEGNOLAM', mueble=mueble, tipo_pieza=tipo,
                 largo=f'{largo:.2f}', ancho=f'{ancho:.2f}', medidas=f'{largo} × {ancho}', panelSKU=sku,
                 espesor=f'{espesor:.2f}')
 
@@ -270,6 +273,50 @@ def test_pieza_libre_se_quita_solo_en_lo_impreso():
     for enlaces in ({}, {clave: 'https://drive.google.com/file/d/ID/view'}):
         html = q.generar_html_etiquetas('Lote', items, enlaces)
         assert 'MTRO 2BLE MEDIDA (345X670)' in html and 'PIEZA LIBRE' not in html, enlaces
+
+
+# --- Un nivel con varios PDF de PB (un closet por PDF) -------------------------
+# Cada mueble de PB se identifica por (PDF, nombre): dos closets pueden tener un
+# mueble que se llama igual con piezas distintas.
+CL03, CL04 = 10000, 20000      # páginas globales de los PDF 1 y 2
+
+
+def test_mismo_mueble_en_dos_pdf_lo_deciden_las_piezas():
+    piezas = [pb(CL03 + 5, 'VISTA-10-120-1.5', 'PIEZA LIBRE COLOR', 720, 120, pdf=1, proyecto='Closet 03'),
+              pb(CL04 + 7, 'VISTA-10-120-1.5', 'PIEZA LIBRE COLOR', 520, 120, pdf=2, proyecto='Closet 04')]
+    items = [et('VISTA-10-120-1.5', 'PIEZA LIBRE COLOR', 720, 120, proyecto='CLOSET-03 D203'),
+             et('VISTA-10-120-1.5', 'PIEZA LIBRE COLOR', 520, 120, proyecto='CLOSET-04 D203')]
+    grupos = q.cruzar(items, piezas)
+    assert [grupos[it['_grupo']]['paginas'] for it in items] == [[CL03 + 5], [CL04 + 7]]
+    assert not any(g['aproximada'] for g in grupos.values())       # el nombre es exacto
+    assert len({g['codigo'] for g in grupos.values()}) == 2        # un archivo por closet
+    filas = q.reporte_filas(grupos, piezas)
+    assert [f[5] for f in filas[1:]] == ['Closet 03: 5', 'Closet 04: 7']
+
+
+def test_entre_pdf_iguales_desempata_el_proyecto():
+    # Mismas medidas en los dos closets pero distinta perforación: decide el proyecto.
+    piezas = [pb(CL03 + 1, 'CLMTRO2-03-200-60', 'Maletero', 598, 1700, pdf=1, proyecto='Closet 03', huella='a'),
+              pb(CL04 + 1, 'CLMTRO2-03-200-60', 'Maletero', 598, 1700, pdf=2, proyecto='Closet 04', huella='b')]
+    g = unico(q.cruzar([et('CLMTRO2-03-200-60', 'Maletero', 598, 1700, proyecto='CLOSET-04 D203')], piezas))
+    assert g['paginas'] == [CL04 + 1]
+
+
+def test_entre_pdf_iguales_sin_proyecto_que_decida_no_se_adivina():
+    piezas = [pb(CL03 + 1, 'CLMTRO2-03-200-60', 'Maletero', 598, 1700, pdf=1, proyecto='Closet 03', huella='a'),
+              pb(CL04 + 1, 'CLMTRO2-03-200-60', 'Maletero', 598, 1700, pdf=2, proyecto='Closet 04', huella='b')]
+    g = unico(q.cruzar([et('CLMTRO2-03-200-60', 'Maletero', 598, 1700, proyecto='CLOSET-05 D203')], piezas))
+    assert g['paginas'] == [] and g['nota'].startswith('Ambigua')
+    assert 'Closet 03' in g['nota'] and 'Closet 04' in g['nota']
+
+
+def test_varios_pdf_y_un_solo_pdf_dan_lo_mismo_si_el_nombre_es_unico():
+    solo = [pb(3, 'GAPV-2P-72-70-60-F15MM', 'Techo', 850, 119.5)]
+    varios = [pb(CL03 + 3, 'GAPV-2P-72-70-60-F15MM', 'Techo', 850, 119.5, pdf=1, proyecto='Cocina'),
+              pb(CL04 + 9, 'ALMIC-2P-91-70-30-F15MM', 'Techo', 670, 299, pdf=2, proyecto='Otro')]
+    a = unico(q.cruzar([et('GAPV-2P-72-70-60-F15MM', 'Techo', 850, 119)], solo))
+    b = unico(q.cruzar([et('GAPV-2P-72-70-60-F15MM', 'Techo', 850, 119)], varios))
+    assert a['paginas'] == [3] and b['paginas'] == [CL03 + 3] and a['codigo'] == b['codigo']
 
 
 if __name__ == '__main__':
